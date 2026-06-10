@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" />
+  <title>Selecionar Certificado</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    /* Barra de drag da janela */
+    #titlebar {
+      -webkit-app-region: drag;
+      background: #16213e;
+      border-bottom: 1px solid #0f3460;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    #titlebar .icon {
+      width: 20px;
+      height: 20px;
+      background: #e94560;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    #titlebar h1 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    /* Conteúdo principal */
+    #content {
+      flex: 1;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow: hidden;
+    }
+
+    #site-info {
+      font-size: 12px;
+      color: #a0aec0;
+      background: #0f3460;
+      border-radius: 6px;
+      padding: 8px 12px;
+      line-height: 1.5;
+    }
+
+    #site-info strong {
+      color: #e94560;
+      word-break: break-all;
+    }
+
+    #list-label {
+      font-size: 12px;
+      color: #a0aec0;
+      font-weight: 500;
+    }
+
+    /* Lista de certificados */
+    #cert-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    #cert-list::-webkit-scrollbar { width: 5px; }
+    #cert-list::-webkit-scrollbar-track { background: #16213e; }
+    #cert-list::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+
+    .cert-item {
+      background: #16213e;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .cert-item:hover {
+      background: #1e2d4a;
+      border-color: #0f3460;
+    }
+
+    .cert-item.selected {
+      border-color: #e94560;
+      background: #1e2d4a;
+    }
+
+    .cert-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .cert-meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .cert-meta span {
+      font-size: 11px;
+      color: #718096;
+    }
+
+    .cert-meta .label {
+      color: #a0aec0;
+      font-weight: 500;
+    }
+
+    .cert-expiry.expired { color: #e94560; }
+    .cert-expiry.soon    { color: #f6ad55; }
+    .cert-expiry.ok      { color: #68d391; }
+
+    /* Badge de tipo */
+    .cert-type {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: #0f3460;
+      color: #90cdf4;
+      margin-bottom: 4px;
+    }
+
+    /* Área de detalhes do cert selecionado */
+    #cert-details {
+      background: #0f3460;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: #a0aec0;
+      min-height: 60px;
+      line-height: 1.8;
+    }
+
+    #cert-details .detail-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    #cert-details .detail-label {
+      color: #718096;
+      min-width: 70px;
+      flex-shrink: 0;
+    }
+
+    #cert-details .detail-value {
+      color: #e0e0e0;
+      word-break: break-all;
+    }
+
+    #no-selection-msg {
+      color: #4a5568;
+      font-style: italic;
+    }
+
+    /* Rodapé com botões */
+    #footer {
+      padding: 12px 16px;
+      background: #16213e;
+      border-top: 1px solid #0f3460;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    button {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+    }
+
+    #btn-cancel {
+      background: #2d3748;
+      color: #a0aec0;
+    }
+
+    #btn-cancel:hover { background: #4a5568; }
+
+    #btn-ok {
+      background: #e94560;
+      color: #fff;
+    }
+
+    #btn-ok:hover:not(:disabled) { background: #c53030; }
+
+    #btn-ok:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    /* Estado vazio */
+    #empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #4a5568;
+    }
+
+    #empty-state .empty-icon { font-size: 32px; }
+    #empty-state p { font-size: 13px; }
+  </style>
+</head>
+<body>
+
+  <div id="titlebar">
+    <div class="icon">🔒</div>
+    <h1>Selecionar Certificado Digital — CFBrowser</h1>
+  </div>
+
+  <div id="content">
+    <div id="site-info">
+      O site <strong id="site-url">...</strong> está solicitando autenticação com certificado digital.
+    </div>
+
+    <div id="list-label">Certificados disponíveis:</div>
+
+    <div id="cert-list">
+      <div id="empty-state">
+        <span class="empty-icon">📭</span>
+        <p>Carregando certificados...</p>
+      </div>
+    </div>
+
+    <div id="cert-details">
+      <span id="no-selection-msg">Selecione um certificado para ver os detalhes.</span>
+    </div>
+  </div>
+
+  <div id="footer">
+    <button id="btn-cancel">Cancelar</button>
+    <button id="btn-ok" disabled>Usar este certificado</button>
+  </div>
+
+  <script src="cert-dialog.js"></script>
+</body>
+</html>

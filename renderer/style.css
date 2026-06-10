@@ -1,0 +1,237 @@
+/* ── Reset e base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* Garante que [hidden] esconda mesmo elementos com display definido por ID. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+button { font-family: inherit; }
+
+/* ── Barra de abas ────────────────────────────────────────────────────── */
+#tab-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 6px 8px 0;
+  background: #0d1b2a;
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+}
+#tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+#tabs::-webkit-scrollbar { height: 0; }
+
+.tab {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 80px;
+  max-width: 220px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 8px 8px 0 0;
+  background: #16213e;
+  color: #a0aec0;
+  cursor: default;
+  user-select: none;
+  transition: background 0.12s;
+}
+.tab:hover { background: #1c2a4e; }
+.tab.active { background: #1a1a2e; color: #fff; }
+
+.tab-favicon { width: 16px; height: 16px; flex-shrink: 0; visibility: hidden; border-radius: 3px; }
+.tab.loading .tab-favicon { visibility: visible; animation: spin 0.8s linear infinite; }
+.tab-title { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.tab-close {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border: none; border-radius: 50%;
+  background: transparent; color: inherit; font-size: 11px; cursor: pointer;
+  flex-shrink: 0; opacity: 0.6;
+}
+.tab-close:hover { background: #e94560; color: #fff; opacity: 1; }
+
+.tab-action {
+  -webkit-app-region: no-drag;
+  width: 30px; height: 30px; margin-bottom: 2px;
+  border: none; border-radius: 6px;
+  background: transparent; color: #a0aec0; font-size: 20px; cursor: pointer;
+  flex-shrink: 0;
+}
+.tab-action:hover { background: #16213e; color: #fff; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Barra de navegação ───────────────────────────────────────────────── */
+#navbar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+.nav-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: none; border-radius: 6px;
+  background: transparent; color: #a0aec0; font-size: 16px; cursor: pointer;
+  transition: background 0.15s, color 0.15s; flex-shrink: 0;
+}
+.nav-btn:hover:not(:disabled) { background: #0f3460; color: #fff; }
+.nav-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* Campo de URL com cadeado + estrela */
+#url-wrap {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  height: 34px; padding: 0 10px;
+  border: 1px solid #0f3460; border-radius: 18px; background: #0f3460;
+  transition: border-color 0.15s, background 0.15s;
+}
+#url-wrap:focus-within { border-color: #e94560; background: #1a1a2e; }
+#url-secure { font-size: 12px; opacity: 0.8; flex-shrink: 0; }
+#url-bar {
+  flex: 1; height: 100%; border: none; background: transparent;
+  color: #e0e0e0; font-size: 13px; outline: none;
+}
+#btn-bookmark {
+  border: none; background: transparent; color: #d4af37;
+  font-size: 17px; cursor: pointer; flex-shrink: 0; line-height: 1;
+}
+#btn-bookmark.active { color: #ffd700; }
+
+#loading-indicator {
+  width: 8px; height: 8px; border-radius: 50%; background: transparent;
+  flex-shrink: 0; transition: background 0.2s;
+}
+#loading-indicator.loading { background: #e94560; animation: pulse 0.8s infinite alternate; }
+@keyframes pulse { from { opacity: 1; } to { opacity: 0.3; } }
+
+/* ── Barra de favoritos ───────────────────────────────────────────────── */
+#bookmarks-bar {
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 10px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+#bookmarks-bar.empty, #bookmarks-bar.hidden { display: none; }
+#bookmarks-bar::-webkit-scrollbar { height: 0; }
+.bookmark {
+  border: none; border-radius: 5px; padding: 4px 10px;
+  background: transparent; color: #cbd5e0; font-size: 12px;
+  white-space: nowrap; cursor: pointer;
+}
+.bookmark:hover { background: #0f3460; color: #fff; }
+
+/* ── Webviews ─────────────────────────────────────────────────────────── */
+#webviews { flex: 1; position: relative; background: #fff; }
+webview { position: absolute; inset: 0; width: 100%; height: 100%; border: none; }
+webview:not(.active) { display: none; }
+webview.active { display: flex; }
+
+/* ── Barra de busca na página ─────────────────────────────────────────── */
+#find-bar {
+  position: absolute; top: 0; right: 16px;
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 10px;
+  background: #16213e; border: 1px solid #0f3460; border-top: none;
+  border-radius: 0 0 8px 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  z-index: 50;
+}
+#find-input {
+  width: 200px; height: 28px; padding: 0 8px;
+  border: 1px solid #0f3460; border-radius: 5px; background: #1a1a2e;
+  color: #e0e0e0; outline: none; font-size: 13px;
+}
+#find-count { font-size: 12px; color: #a0aec0; min-width: 36px; text-align: center; }
+.find-btn {
+  width: 26px; height: 26px; border: none; border-radius: 5px;
+  background: #0f3460; color: #cbd5e0; cursor: pointer; font-size: 12px;
+}
+.find-btn:hover { background: #e94560; color: #fff; }
+
+/* ── Menu suspenso (⋮) ────────────────────────────────────────────────── */
+#app-menu {
+  position: absolute; top: 78px; right: 10px;
+  width: 280px; padding: 6px;
+  background: #16213e; border: 1px solid #0f3460; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5); z-index: 100;
+}
+.menu-item {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 8px 10px; border: none; border-radius: 6px;
+  background: transparent; color: #e0e0e0; font-size: 13px;
+  cursor: pointer; text-align: left;
+}
+.menu-item:hover { background: #0f3460; }
+.menu-item kbd {
+  font-size: 11px; color: #718096; background: #0d1b2a;
+  padding: 2px 6px; border-radius: 4px;
+}
+.menu-sep { height: 1px; background: #0f3460; margin: 4px 0; }
+.menu-zoom { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; }
+.menu-zoom > span:first-child { font-size: 13px; }
+#zoom-level { min-width: 48px; text-align: center; font-size: 12px; color: #a0aec0; }
+.zoom-btn { width: 30px; padding: 4px 0; justify-content: center; background: #0f3460; }
+
+/* ── Overlay de histórico ─────────────────────────────────────────────── */
+#history-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.55); z-index: 200;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding-top: 8vh;
+}
+#history-panel {
+  width: min(760px, 92%); max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: #16213e; border: 1px solid #0f3460; border-radius: 12px;
+  overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+}
+#history-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; border-bottom: 1px solid #0f3460;
+}
+#history-header h2 { font-size: 16px; flex-shrink: 0; }
+#history-search {
+  flex: 1; height: 32px; padding: 0 10px;
+  border: 1px solid #0f3460; border-radius: 6px; background: #1a1a2e;
+  color: #e0e0e0; outline: none; font-size: 13px;
+}
+#history-clear, #history-close {
+  border: none; border-radius: 6px; padding: 7px 10px;
+  background: #0f3460; color: #cbd5e0; cursor: pointer; font-size: 12px;
+}
+#history-clear:hover, #history-close:hover { background: #e94560; color: #fff; }
+
+#history-list { overflow-y: auto; padding: 6px; }
+.history-row {
+  display: grid; grid-template-columns: 90px 1fr 1.3fr 26px;
+  align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 6px; cursor: pointer;
+}
+.history-row:hover { background: #0f3460; }
+.history-time { font-size: 11px; color: #718096; }
+.history-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-url { font-size: 12px; color: #5b9bd5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.history-del {
+  width: 22px; height: 22px; border: none; border-radius: 50%;
+  background: transparent; color: #a0aec0; cursor: pointer; opacity: 0.6;
+}
+.history-del:hover { background: #e94560; color: #fff; opacity: 1; }
+.history-empty { padding: 30px; text-align: center; color: #718096; }
+
+/* ── Scrollbar customizada ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #16213e; }
+::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #e94560; }

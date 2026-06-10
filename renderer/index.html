@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: http: data:; connect-src 'self'" />
+  <title>CFBrowser</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ── Barra de abas ──────────────────────────────────────────────── -->
+    <div id="tab-bar">
+      <div id="tabs"></div>
+      <button id="btn-new-tab" class="tab-action" title="Nova aba (Ctrl+T)">+</button>
+    </div>
+
+    <!-- ── Barra de navegação ─────────────────────────────────────────── -->
+    <nav id="navbar">
+      <button class="nav-btn" id="btn-back"    title="Voltar (Alt+←)">&#8592;</button>
+      <button class="nav-btn" id="btn-forward" title="Avançar (Alt+→)">&#8594;</button>
+      <button class="nav-btn" id="btn-reload"  title="Recarregar (Ctrl+R)">&#8635;</button>
+      <button class="nav-btn" id="btn-home"    title="Página inicial">&#8962;</button>
+
+      <div id="url-wrap">
+        <span id="url-secure" title="Conexão">&#128274;</span>
+        <input id="url-bar" type="text" placeholder="Pesquise no Google ou digite uma URL" spellcheck="false" />
+        <button id="btn-bookmark" title="Adicionar aos favoritos (Ctrl+D)">&#9734;</button>
+      </div>
+
+      <span id="loading-indicator" title="Carregando..."></span>
+      <button class="nav-btn" id="btn-menu" title="Menu">&#8942;</button>
+    </nav>
+
+    <!-- ── Barra de favoritos ─────────────────────────────────────────── -->
+    <div id="bookmarks-bar"></div>
+
+    <!-- ── Container das webviews (uma por aba) ───────────────────────── -->
+    <div id="webviews"></div>
+
+    <!-- ── Barra de busca na página ───────────────────────────────────── -->
+    <div id="find-bar" hidden>
+      <input id="find-input" type="text" placeholder="Buscar na página" spellcheck="false" />
+      <span id="find-count">0/0</span>
+      <button id="find-prev" class="find-btn" title="Anterior">&#8593;</button>
+      <button id="find-next" class="find-btn" title="Próximo">&#8595;</button>
+      <button id="find-close" class="find-btn" title="Fechar">&#10005;</button>
+    </div>
+
+    <!-- ── Menu suspenso (botão ⋮) ────────────────────────────────────── -->
+    <div id="app-menu" hidden>
+      <button class="menu-item" data-action="new-tab">Nova aba <kbd>Ctrl+T</kbd></button>
+      <button class="menu-item" data-action="history">Histórico <kbd>Ctrl+H</kbd></button>
+      <button class="menu-item" data-action="bookmark">Favoritar página <kbd>Ctrl+D</kbd></button>
+      <button class="menu-item" data-action="find">Buscar na página <kbd>Ctrl+F</kbd></button>
+      <div class="menu-sep"></div>
+      <div class="menu-zoom">
+        <span>Zoom</span>
+        <button class="menu-item zoom-btn" data-action="zoom-out">&minus;</button>
+        <span id="zoom-level">100%</span>
+        <button class="menu-item zoom-btn" data-action="zoom-in">+</button>
+      </div>
+      <div class="menu-sep"></div>
+      <button class="menu-item" data-action="devtools">Ferramentas do desenvolvedor <kbd>F12</kbd></button>
+    </div>
+
+    <!-- ── Overlay de histórico ───────────────────────────────────────── -->
+    <div id="history-overlay" hidden>
+      <div id="history-panel">
+        <div id="history-header">
+          <h2>Histórico</h2>
+          <input id="history-search" type="text" placeholder="Buscar no histórico..." spellcheck="false" />
+          <button id="history-clear" title="Limpar todo o histórico">Limpar tudo</button>
+          <button id="history-close" title="Fechar">&#10005;</button>
+        </div>
+        <div id="history-list"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="browser.js"></script>
+</body>
+</html>
