@@ -433,6 +433,23 @@ historySearch.addEventListener('input', async () => {
 });
 historyOverlay.addEventListener('click', (e) => { if (e.target === historyOverlay) closeHistory(); });
 
+// ── Controles de janela (frameless) ─────────────────────────────────────
+const winMax = $('win-max');
+const icoMax = winMax.querySelector('.ico-max');
+const icoRestore = winMax.querySelector('.ico-restore');
+
+function setMaxIcon(isMax) {
+  icoMax.hidden = isMax;
+  icoRestore.hidden = !isMax;
+  winMax.title = isMax ? 'Restaurar' : 'Maximizar';
+}
+
+$('win-min').addEventListener('click', () => API.window.minimize());
+winMax.addEventListener('click', () => API.window.toggleMaximize());
+$('win-close').addEventListener('click', () => API.window.close());
+$('drag-spacer').addEventListener('dblclick', () => API.window.toggleMaximize());
+API.window.onMaximizeChange(setMaxIcon);
+
 // Ações vindas do Menu nativo / atalhos (main process)
 API.onMenuAction((action, ...args) => handleAction(action, args[0]));
 
@@ -448,6 +465,7 @@ document.addEventListener('keydown', (e) => {
 // ── Inicialização ───────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   HOME_PAGE = await API.getHomePage();
+  setMaxIcon(await API.window.isMaximized());
   await renderBookmarksBar();
   createTab(HOME_PAGE);
 });

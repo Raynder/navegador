@@ -27,6 +27,16 @@ contextBridge.exposeInMainWorld('browserAPI', {
     remove: (url) => ipcRenderer.invoke('bookmarks:remove', url),
   },
 
+  // ── Controles da janela (frameless) ─────────────────────────────────────
+  window: {
+    minimize: () => ipcRenderer.send('window:minimize'),
+    toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
+    close: () => ipcRenderer.send('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+    onMaximizeChange: (callback) =>
+      ipcRenderer.on('window:maximized', (_e, isMax) => callback(isMax)),
+  },
+
   /**
    * Recebe ações de menu/atalho vindas do main process.
    * @param {(action: string, ...args: any[]) => void} callback

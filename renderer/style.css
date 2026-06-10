@@ -27,8 +27,27 @@ button { font-family: inherit; }
   -webkit-app-region: drag;
   flex-shrink: 0;
 }
-#tabs { display: flex; gap: 2px; flex: 1; overflow-x: auto; }
+#tabs { display: flex; gap: 2px; flex: 0 1 auto; overflow-x: auto; }
 #tabs::-webkit-scrollbar { height: 0; }
+
+/* Área flexível arrastável entre as abas e os controles de janela */
+#drag-spacer { flex: 1 1 auto; min-width: 40px; align-self: stretch; }
+
+/* ── Controles de janela (minimizar / maximizar / fechar) ─────────────── */
+#window-controls {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-self: stretch;
+  margin: -6px -8px 0 0;   /* cancela o padding da barra para colar no canto */
+}
+.win-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 46px; border: none;
+  background: transparent; color: #cbd5e0; cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.win-btn:hover { background: #243352; color: #fff; }
+.win-close:hover { background: #e81123; color: #fff; }
 
 .tab {
   -webkit-app-region: no-drag;

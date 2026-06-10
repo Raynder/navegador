@@ -10,10 +10,27 @@
 <body>
   <div id="app">
 
-    <!-- ── Barra de abas ──────────────────────────────────────────────── -->
+    <!-- ── Barra de abas (também é a área de arrastar a janela) ───────── -->
     <div id="tab-bar">
       <div id="tabs"></div>
       <button id="btn-new-tab" class="tab-action" title="Nova aba (Ctrl+T)">+</button>
+
+      <!-- Espaço flexível arrastável entre as abas e os controles -->
+      <div id="drag-spacer"></div>
+
+      <!-- Controles de janela (minimizar / maximizar / fechar) -->
+      <div id="window-controls">
+        <button id="win-min" class="win-btn" title="Minimizar" aria-label="Minimizar">
+          <svg width="11" height="11" viewBox="0 0 11 11"><line x1="1" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1"/></svg>
+        </button>
+        <button id="win-max" class="win-btn" title="Maximizar" aria-label="Maximizar">
+          <svg class="ico-max" width="11" height="11" viewBox="0 0 11 11"><rect x="1.5" y="1.5" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+          <svg class="ico-restore" width="11" height="11" viewBox="0 0 11 11" hidden><rect x="1.5" y="3.5" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1"/><path d="M3.5 3.5 V1.5 H9.5 V7.5 H7.5" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        </button>
+        <button id="win-close" class="win-btn win-close" title="Fechar" aria-label="Fechar">
+          <svg width="11" height="11" viewBox="0 0 11 11"><line x1="1.5" y1="1.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1"/><line x1="9.5" y1="1.5" x2="1.5" y2="9.5" stroke="currentColor" stroke-width="1"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- ── Barra de navegação ─────────────────────────────────────────── -->

@@ -124,7 +124,11 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
+    minWidth: 480,
+    minHeight: 360,
     title: APP_NAME,
+    frame: false,            // sem barra de título/menu nativos — usamos UI própria
+    backgroundColor: '#0d1b2a',
     // icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -133,6 +137,15 @@ function createWindow() {
       webviewTag: true,
     },
   });
+
+  // Avisa o renderer quando o estado de maximização muda (para trocar o ícone).
+  const sendMaxState = () => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window:maximized', mainWindow.isMaximized());
+    }
+  };
+  mainWindow.on('maximize', sendMaxState);
+  mainWindow.on('unmaximize', sendMaxState);
 
   // Força configurações seguras + stealth em TODA <webview> criada pelo renderer.
   mainWindow.webContents.on('will-attach-webview', (_event, webPreferences, params) => {
@@ -263,6 +276,15 @@ function configureSession() {
 // ---------------------------------------------------------------------------
 function setupIpcHandlers() {
   ipcMain.handle('get-home-page', () => HOME_PAGE);
+
+  // Controles de janela (substituem os botões nativos da barra de título)
+  ipcMain.on('window:minimize', () => mainWindow?.minimize());
+  ipcMain.on('window:toggle-maximize', () => {
+    if (!mainWindow) return;
+    mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
+  });
+  ipcMain.on('window:close', () => mainWindow?.close());
+  ipcMain.handle('window:is-maximized', () => !!mainWindow?.isMaximized());
 
   // Histórico
   ipcMain.on('history:add', (_e, { url, title }) => history.add(url, title));
