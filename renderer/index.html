@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: http: data:; connect-src 'self'" />
-  <title>CFBrowser</title>
+  <title>Certix</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -99,6 +99,7 @@
     <div id="app-menu" hidden>
       <button class="menu-item" data-action="new-tab">Nova aba <kbd>Ctrl+T</kbd></button>
       <button class="menu-item" data-action="history">Histórico <kbd>Ctrl+H</kbd></button>
+      <button class="menu-item" data-action="downloads">Downloads <kbd>Ctrl+J</kbd></button>
       <button class="menu-item" data-action="bookmark">Favoritar página <kbd>Ctrl+D</kbd></button>
       <button class="menu-item" data-action="find">Buscar na página <kbd>Ctrl+F</kbd></button>
       <div class="menu-sep"></div>
@@ -109,7 +110,20 @@
         <button class="menu-item zoom-btn" data-action="zoom-in">+</button>
       </div>
       <div class="menu-sep"></div>
+      <button class="menu-item" data-action="print">Imprimir <kbd>Ctrl+P</kbd></button>
       <button class="menu-item" data-action="devtools">Ferramentas do desenvolvedor <kbd>F12</kbd></button>
+    </div>
+
+    <!-- ── Overlay de downloads ─────────────────────────────────────── -->
+    <div id="downloads-overlay" hidden>
+      <div id="downloads-panel">
+        <div id="downloads-header">
+          <h2>Downloads</h2>
+          <button id="downloads-clear">Limpar concluídos</button>
+          <button id="downloads-close" title="Fechar">&#10005;</button>
+        </div>
+        <div id="downloads-list"></div>
+      </div>
     </div>
 
     <!-- ── Overlay de histórico ───────────────────────────────────────── -->

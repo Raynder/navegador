@@ -203,6 +203,67 @@ webview.active { display: flex; }
 #zoom-level { min-width: 48px; text-align: center; font-size: 12px; color: #a0aec0; }
 .zoom-btn { width: 30px; padding: 4px 0; justify-content: center; background: #0f3460; }
 
+/* ── Overlay de downloads ─────────────────────────────────────────────── */
+#downloads-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.55); z-index: 200;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding-top: 8vh;
+}
+#downloads-panel {
+  width: min(680px, 92%); max-height: 80vh;
+  display: flex; flex-direction: column;
+  background: #16213e; border: 1px solid #0f3460; border-radius: 12px;
+  overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+}
+#downloads-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 18px; border-bottom: 1px solid #0f3460; flex-shrink: 0;
+}
+#downloads-header h2 { font-size: 16px; flex-shrink: 0; }
+#downloads-clear, #downloads-close {
+  border: none; border-radius: 6px; padding: 7px 10px;
+  background: #0f3460; color: #cbd5e0; cursor: pointer; font-size: 12px;
+}
+#downloads-clear { margin-left: auto; }
+#downloads-clear:hover, #downloads-close:hover { background: #e94560; color: #fff; }
+#downloads-list { overflow-y: auto; padding: 8px; }
+
+.dl-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 12px; border-radius: 8px;
+  border-bottom: 1px solid #0d1b2a;
+}
+.dl-row:last-child { border-bottom: none; }
+.dl-row:hover { background: #0f3460; }
+.dl-row-icon { font-size: 18px; flex-shrink: 0; margin-top: 2px; }
+.dl-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dl-row-name {
+  font-size: 13px; font-weight: 600; color: #e0e0e0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dl-row-path {
+  font-size: 11px; color: #4a5568;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dl-row-bottom { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.dl-row-progresswrap { flex: 1; height: 4px; background: #0d1b2a; border-radius: 2px; max-width: 200px; }
+.dl-row-progressbar  { height: 100%; background: #5b9bd5; border-radius: 2px; transition: width 0.3s; }
+.dl-row-pct  { font-size: 11px; color: #a0aec0; }
+.dl-row-size { font-size: 11px; color: #718096; }
+.dl-row-status      { font-size: 11px; font-weight: 600; }
+.dl-row-status.ok   { color: #68d391; }
+.dl-row-status.err  { color: #e94560; }
+.dl-row-actions { display: flex; gap: 6px; flex-shrink: 0; align-self: center; }
+.dl-act {
+  border: none; border-radius: 5px; padding: 4px 10px;
+  font-size: 11px; cursor: pointer;
+  background: #0f3460; color: #cbd5e0;
+}
+.dl-act:hover { background: #5b9bd5; color: #fff; }
+.dl-act-remove:hover { background: #e94560; color: #fff; }
+.downloads-empty { padding: 30px; text-align: center; color: #718096; font-size: 13px; }
+
 /* ── Overlay de histórico ─────────────────────────────────────────────── */
 #history-overlay {
   position: absolute; inset: 0;

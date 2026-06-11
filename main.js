@@ -259,20 +259,37 @@ function configureSession() {
   const AUTO_GRANT = new Set(['notifications', 'fullscreen', 'pointerLock', 'clipboard-sanitized-write']);
   ses.setPermissionRequestHandler((_wc, permission, cb) => cb(AUTO_GRANT.has(permission)));
 
-  // Downloads — salva em ~/Downloads e notifica o renderer com progresso.
+  // Downloads — salva em ~/Downloads (evita sobrescrita) e notifica o renderer.
   ses.on('will-download', (_event, item) => {
     const id = Date.now();
-    const filename = item.getFilename();
-    const savePath = path.join(app.getPath('downloads'), filename);
+    const downloadsDir = app.getPath('downloads');
+
+    // Resolve nome único para não sobrescrever arquivo existente
+    let filename = item.getFilename();
+    let savePath = path.join(downloadsDir, filename);
+    if (fs.existsSync(savePath)) {
+      const ext  = path.extname(filename);
+      const base = path.basename(filename, ext);
+      let n = 1;
+      while (fs.existsSync(path.join(downloadsDir, `${base} (${n})${ext}`))) n++;
+      filename = `${base} (${n})${ext}`;
+      savePath = path.join(downloadsDir, filename);
+    }
+
     item.setSavePath(savePath);
+    console.log(`[Download] Iniciado: ${filename} → ${savePath} (${(item.getTotalBytes()/1024/1024).toFixed(1)} MB)`);
+
     const notify = (ch, data) => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(ch, data);
     };
+
     notify('download:start', { id, filename, savePath, total: item.getTotalBytes() });
     item.on('updated', (_e, state) =>
       notify('download:progress', { id, state, received: item.getReceivedBytes(), total: item.getTotalBytes() }));
-    item.on('done', (_e, state) =>
-      notify('download:done', { id, state, savePath, filename }));
+    item.on('done', (_e, state) => {
+      console.log(`[Download] ${state}: ${filename}`);
+      notify('download:done', { id, state, savePath, filename });
+    });
   });
 
   // Seleção de certificado cliente — evento de app, vale para todas as sessões.
@@ -415,6 +432,7 @@ function buildMenu() {
         { type: 'separator' },
         { label: 'Página inicial', accelerator: 'Alt+Home', click: () => send('home') },
         { label: 'Mostrar histórico', accelerator: 'CmdOrCtrl+H', click: () => send('history') },
+        { label: 'Downloads', accelerator: 'CmdOrCtrl+J', click: () => send('downloads') },
       ],
     },
     {
@@ -515,6 +533,95 @@ function runDiagnostics(guest) {
 }
 
 // ---------------------------------------------------------------------------
+// Teste de download (CFB_DL_TEST=1)
+// Navega até https://ash-speed.hetzner.com/ e baixa o arquivo 100MB.bin.
+// Exibe progresso no terminal e encerra ao concluir.
+// Uso: set CFB_DL_TEST=1 && npm start
+// ---------------------------------------------------------------------------
+function runDownloadTest() {
+  const TEST_URL  = 'https://ash-speed.hetzner.com/100MB.bin';
+  const log       = (...a) => console.log('[DL-TEST]', ...a);
+  const ses       = session.fromPartition(WEBVIEW_PARTITION);
+  let   started   = false;
+
+  log('─'.repeat(60));
+  log(`URL         : ${TEST_URL}`);
+  log(`Downloads   : ${app.getPath('downloads')}`);
+  log(`Sessão      : ${WEBVIEW_PARTITION}`);
+  log('─'.repeat(60));
+
+  // Listener de diagnóstico (complementa o listener normal de will-download)
+  const diagListener = (_event, item) => {
+    started = true;
+    const startedAt = Date.now();
+    log(`✅ will-download disparou: ${item.getFilename()}`);
+    log(`   save path  : ${item.getSavePath()}`);
+    log(`   total      : ${(item.getTotalBytes() / 1024 / 1024).toFixed(2)} MB`);
+
+    let lastPct = -1;
+    item.on('updated', (_e, state) => {
+      const total    = item.getTotalBytes();
+      const received = item.getReceivedBytes();
+      if (state === 'interrupted') { log('⚠️  Interrompido.'); return; }
+      if (total > 0) {
+        const pct = Math.round((received / total) * 100);
+        if (pct >= lastPct + 10) {
+          const speed = received / ((Date.now() - startedAt) / 1000) / 1024 / 1024;
+          log(`   ${String(pct).padStart(3)}%  ${(received/1024/1024).toFixed(1)}/${(total/1024/1024).toFixed(1)} MB  @ ${speed.toFixed(1)} MB/s`);
+          lastPct = pct;
+        }
+      } else {
+        log(`   recebido: ${(received/1024/1024).toFixed(1)} MB (Content-Length ausente)`);
+      }
+    });
+
+    item.on('done', (_e, state) => {
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      if (state === 'completed') {
+        const size = fs.existsSync(item.getSavePath())
+          ? (fs.statSync(item.getSavePath()).size / 1024 / 1024).toFixed(2)
+          : '?';
+        log(`✅ Concluído em ${elapsed}s — ${size} MB gravados em disco`);
+        log(`   Arquivo: ${item.getSavePath()}`);
+      } else {
+        log(`❌ Estado final: "${state}" após ${elapsed}s`);
+      }
+      ses.removeListener('will-download', diagListener);
+      setTimeout(() => app.quit(), 800);
+    });
+  };
+
+  ses.on('will-download', diagListener);
+
+  // Abre a URL no browser assim que o renderer estiver pronto
+  const triggerDownload = () => {
+    log('Disparando download...');
+    mainWindow.webContents.send('menu', 'open-url-newtab', TEST_URL);
+
+    // Se will-download não disparar em 15s, reporta diagnóstico
+    setTimeout(() => {
+      if (!started) {
+        log('❌ Timeout: will-download não disparou em 15s.');
+        log('   Possíveis causas:');
+        log('   1. Servidor não enviou Content-Disposition/application/octet-stream');
+        log('   2. Electron tratou como navegação, não download');
+        log('   3. Sessão errada (webview usa partição diferente de persist:main?)');
+        log(`   4. URL inacessível: ${TEST_URL}`);
+        app.quit();
+      }
+    }, 15000);
+  };
+
+  // Aguarda o renderer carregar antes de disparar
+  const waitReady = setInterval(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mainWindow.webContents.isLoading()) return;
+    clearInterval(waitReady);
+    setTimeout(triggerDownload, 800);
+  }, 200);
+}
+
+// ---------------------------------------------------------------------------
 // Inicialização
 // ---------------------------------------------------------------------------
 app.whenReady().then(async () => {
@@ -534,6 +641,8 @@ app.whenReady().then(async () => {
   buildMenu();
   createWindow();
   await loadExtensions(ses);
+
+  if (process.env.CFB_DL_TEST) runDownloadTest();
 });
 
 app.on('window-all-closed', () => {

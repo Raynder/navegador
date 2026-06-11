@@ -22,8 +22,10 @@ const newtabOverlay    = $('newtab-overlay');
 const newtabSearch     = $('newtab-search');
 const newtabBookmarks  = $('newtab-bookmarks');
 const newtabRecent     = $('newtab-recent');
-const downloadBar      = $('download-bar');
-const downloadItemsEl  = $('download-items');
+const downloadBar        = $('download-bar');
+const downloadItemsEl    = $('download-items');
+const downloadsOverlay   = $('downloads-overlay');
+const downloadsListEl    = $('downloads-list');
 // Find bar
 const findBar    = $('find-bar');
 const findInput  = $('find-input');
@@ -508,7 +510,86 @@ function updateZoomLabel() {
   zoomLevelEl.textContent = `${pct}%`;
 }
 
-// ── Downloads ───────────────────────────────────────────────────────────
+// ── Downloads — overlay ─────────────────────────────────────────────────
+function openDownloads() {
+  downloadsOverlay.hidden = false;
+  renderDownloadsOverlay();
+}
+function closeDownloads() { downloadsOverlay.hidden = true; }
+
+function renderDownloadsOverlay() {
+  downloadsListEl.innerHTML = '';
+  if (activeDownloads.size === 0) {
+    downloadsListEl.innerHTML = '<div class="downloads-empty">Nenhum download nesta sessão.</div>';
+    return;
+  }
+  for (const [id, dl] of [...activeDownloads.entries()].reverse()) {
+    const isActive = dl.state === 'progressing';
+    const isDone   = dl.state === 'completed';
+    const isFailed = !isActive && !isDone;
+    const pct      = dl.total > 0 ? Math.round((dl.received / dl.total) * 100) : 0;
+
+    const row = document.createElement('div');
+    row.className = 'dl-row';
+    row.dataset.dlId = id;
+
+    let progressHtml = '';
+    if (isActive) {
+      progressHtml = `
+        <div class="dl-row-progresswrap"><div class="dl-row-progressbar" style="width:${pct}%"></div></div>
+        <span class="dl-row-pct">${pct}%</span>`;
+    } else if (isDone) {
+      progressHtml = `<span class="dl-row-status ok">Concluído</span>`;
+    } else {
+      progressHtml = `<span class="dl-row-status err">Falhou</span>`;
+    }
+
+    row.innerHTML = `
+      <div class="dl-row-icon">${isDone ? '✅' : isFailed ? '❌' : '⬇️'}</div>
+      <div class="dl-row-info">
+        <span class="dl-row-name"></span>
+        <span class="dl-row-path"></span>
+        <div class="dl-row-bottom">
+          ${progressHtml}
+          ${dl.total > 0 ? `<span class="dl-row-size">${(dl.total/1024/1024).toFixed(1)} MB</span>` : ''}
+        </div>
+      </div>
+      <div class="dl-row-actions">
+        ${isDone ? `<button class="dl-act dl-act-open">Abrir</button>` : ''}
+        <button class="dl-act dl-act-remove" title="Remover da lista">&#10005;</button>
+      </div>`;
+
+    row.querySelector('.dl-row-name').textContent = dl.filename;
+    row.querySelector('.dl-row-path').textContent = dl.savePath;
+    if (isDone) {
+      row.querySelector('.dl-act-open').addEventListener('click', () => API.downloads.openFile(dl.savePath));
+    }
+    row.querySelector('.dl-act-remove').addEventListener('click', () => {
+      activeDownloads.delete(id);
+      row.remove();
+      if (activeDownloads.size === 0) {
+        downloadsListEl.innerHTML = '<div class="downloads-empty">Nenhum download nesta sessão.</div>';
+        downloadBar.hidden = true;
+      } else {
+        renderDownloads();
+      }
+    });
+    downloadsListEl.appendChild(row);
+  }
+}
+
+$('downloads-close').addEventListener('click', closeDownloads);
+$('downloads-clear').addEventListener('click', () => {
+  for (const [id, dl] of activeDownloads) {
+    if (dl.state !== 'progressing') activeDownloads.delete(id);
+  }
+  if (activeDownloads.size === 0) downloadBar.hidden = true;
+  else renderDownloads();
+  renderDownloadsOverlay();
+});
+downloadsOverlay.addEventListener('click', (e) => { if (e.target === downloadsOverlay) closeDownloads(); });
+
+// ── Downloads — barra inferior ───────────────────────────────────────────
 function renderDownloads() {
   downloadItemsEl.innerHTML = '';
   for (const [id, dl] of [...activeDownloads.entries()].reverse()) {
@@ -541,16 +622,19 @@ API.downloads.onStart((d) => {
   activeDownloads.set(d.id, { ...d, received: 0, state: 'progressing' });
   downloadBar.hidden = false;
   renderDownloads();
+  if (!downloadsOverlay.hidden) renderDownloadsOverlay();
 });
 API.downloads.onProgress((d) => {
   const dl = activeDownloads.get(d.id);
   if (dl) { dl.received = d.received; dl.total = d.total; }
   renderDownloads();
+  if (!downloadsOverlay.hidden) renderDownloadsOverlay();
 });
 API.downloads.onDone((d) => {
   const dl = activeDownloads.get(d.id);
   if (dl) { dl.state = d.state; dl.savePath = d.savePath; }
   renderDownloads();
+  if (!downloadsOverlay.hidden) renderDownloadsOverlay();
 });
 
 $('download-bar-close').addEventListener('click', () => {
@@ -593,6 +677,7 @@ function handleAction(action, arg) {
     case 'bookmark':          toggleBookmark(); break;
     case 'toggle-bookmarks-bar': bookmarksBar.classList.toggle('hidden'); break;
     case 'history':           historyOverlay.hidden ? openHistory() : closeHistory(); break;
+    case 'downloads':         downloadsOverlay.hidden ? openDownloads() : closeDownloads(); break;
     case 'find':              openFind(); break;
     case 'zoom-in':           setZoom(0.5); break;
     case 'zoom-out':          setZoom(-0.5); break;
@@ -672,6 +757,7 @@ API.onMenuAction((action, ...args) => handleAction(action, args[0]));
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!appMenu.hidden) toggleAppMenu(false);
+    else if (!downloadsOverlay.hidden) closeDownloads();
     else if (!historyOverlay.hidden) closeHistory();
     else if (!findBar.hidden) closeFind();
     else if (!newtabOverlay.hidden) hideNewtab();

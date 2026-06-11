@@ -139,6 +139,16 @@ set CFB_DIAG=1 && npm start
 
 O app abre, executa os testes, imprime o resultado no terminal e fecha sozinho.
 
+## Teste de download
+
+Baixa o arquivo `100MB.bin` do servidor de velocidade da Hetzner e exibe progresso no terminal:
+
+```cmd
+set CFB_DL_TEST=1 && npm start
+```
+
+Exibe: evento `will-download`, velocidade a cada 10%, tamanho em disco ao concluir. Encerra sozinho.
+
 ## Tecnologia
 
 - **Electron 28** (Chromium 120)
