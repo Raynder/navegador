@@ -1,27 +1,29 @@
-/**
- * Renderer — UI do browser com múltiplas abas, favoritos, histórico e atalhos.
- * Acessa o main process exclusivamente via window.browserAPI (preload.js).
- */
-
 const API = window.browserAPI;
 
 // ── Elementos da UI ─────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
-const tabsEl        = $('tabs');
-const webviewsEl    = $('webviews');
-const urlBar        = $('url-bar');
-const urlSecure     = $('url-secure');
-const btnBack       = $('btn-back');
-const btnForward    = $('btn-forward');
-const btnReload     = $('btn-reload');
-const btnHome       = $('btn-home');
-const btnBookmark   = $('btn-bookmark');
-const btnNewTab     = $('btn-new-tab');
-const btnMenu       = $('btn-menu');
-const loadingInd    = $('loading-indicator');
-const bookmarksBar  = $('bookmarks-bar');
-const appMenu       = $('app-menu');
-const zoomLevelEl   = $('zoom-level');
+const tabsEl           = $('tabs');
+const webviewsEl       = $('webviews');
+const urlBar           = $('url-bar');
+const urlSecure        = $('url-secure');
+const btnBack          = $('btn-back');
+const btnForward       = $('btn-forward');
+const btnReload        = $('btn-reload');
+const btnHome          = $('btn-home');
+const btnBookmark      = $('btn-bookmark');
+const btnNewTab        = $('btn-new-tab');
+const btnMenu          = $('btn-menu');
+const loadingInd       = $('loading-indicator');
+const bookmarksBar     = $('bookmarks-bar');
+const appMenu          = $('app-menu');
+const zoomLevelEl      = $('zoom-level');
+const urlSuggestionsEl = $('url-suggestions');
+const newtabOverlay    = $('newtab-overlay');
+const newtabSearch     = $('newtab-search');
+const newtabBookmarks  = $('newtab-bookmarks');
+const newtabRecent     = $('newtab-recent');
+const downloadBar      = $('download-bar');
+const downloadItemsEl  = $('download-items');
 // Find bar
 const findBar    = $('find-bar');
 const findInput  = $('find-input');
@@ -33,10 +35,11 @@ const historySearch  = $('history-search');
 
 // ── Estado ──────────────────────────────────────────────────────────────
 let HOME_PAGE = 'https://www.google.com';
-const tabs = [];           // { id, webview, tabEl, url, title, loading }
+const tabs = [];           // { id, webview, tabEl, url, title, loading, isNewTab }
 let activeTabId = null;
 let tabSeq = 0;
 const closedTabs = [];     // pilha de URLs de abas fechadas (para reabrir)
+const activeDownloads = new Map();
 
 // ── Utilidades de URL ───────────────────────────────────────────────────
 function parseInput(input) {
@@ -61,16 +64,30 @@ function prettifySecure(url) {
   else { urlSecure.textContent = '\u{1F4C4}'; urlSecure.title = ''; }
 }
 
+// ── Sessão — save com debounce ──────────────────────────────────────────
+let _saveSessionTimer = null;
+function saveSession() {
+  clearTimeout(_saveSessionTimer);
+  _saveSessionTimer = setTimeout(() => {
+    const data = tabs
+      .map((t) => ({ url: t.url, title: t.title }))
+      .filter((t) => t.url && !/^about:/.test(t.url));
+    API.session.save({ tabs: data });
+  }, 800);
+}
+
 // ── Gerenciamento de abas ───────────────────────────────────────────────
 function getTab(id) { return tabs.find((t) => t.id === id); }
 function activeTab() { return getTab(activeTabId); }
 
-function createTab(url = HOME_PAGE, { activate = true } = {}) {
+function createTab(url = '', { activate = true } = {}) {
   const id = ++tabSeq;
+  const isNewTab = !url || url === 'about:blank';
+  const src = isNewTab ? 'about:blank' : (parseInput(url) || 'about:blank');
 
   // Webview
   const wv = document.createElement('webview');
-  wv.setAttribute('src', parseInput(url) || HOME_PAGE);
+  wv.setAttribute('src', src);
   wv.setAttribute('partition', 'persist:main');
   wv.setAttribute('allowpopups', '');
   wv.dataset.tabId = String(id);
@@ -86,15 +103,14 @@ function createTab(url = HOME_PAGE, { activate = true } = {}) {
     <button class="tab-close" title="Fechar aba">&#10005;</button>`;
   tabsEl.appendChild(tabEl);
 
-  const tab = { id, webview: wv, tabEl, url: '', title: 'Nova aba', loading: false };
+  const tab = { id, webview: wv, tabEl, url: '', title: 'Nova aba', loading: false, isNewTab };
   tabs.push(tab);
 
-  // Cliques na aba
   tabEl.addEventListener('click', (e) => {
     if (e.target.closest('.tab-close')) { closeTab(id); return; }
     activateTab(id);
   });
-  tabEl.addEventListener('auxclick', (e) => { if (e.button === 1) closeTab(id); }); // botão do meio
+  tabEl.addEventListener('auxclick', (e) => { if (e.button === 1) closeTab(id); });
 
   wireWebview(tab);
   if (activate) activateTab(id);
@@ -112,6 +128,8 @@ function activateTab(id) {
   }
   syncToolbar(tab);
   closeFind();
+  if (tab.isNewTab) showNewtab();
+  else hideNewtab();
 }
 
 function closeTab(id) {
@@ -124,16 +142,16 @@ function closeTab(id) {
   tab.tabEl.remove();
   tabs.splice(idx, 1);
 
-  if (tabs.length === 0) { createTab(HOME_PAGE); return; }
+  if (tabs.length === 0) { createTab(); return; }
   if (activeTabId === id) {
-    const next = tabs[Math.min(idx, tabs.length - 1)];
-    activateTab(next.id);
+    activateTab(tabs[Math.min(idx, tabs.length - 1)].id);
   }
+  saveSession();
 }
 
 function reopenClosedTab() {
   const url = closedTabs.pop();
-  createTab(url || HOME_PAGE);
+  createTab(url || '');
 }
 
 function selectTabByIndex(which) {
@@ -145,8 +163,7 @@ function selectTabByIndex(which) {
 function cycleTab(dir) {
   const idx = tabs.findIndex((t) => t.id === activeTabId);
   if (idx === -1) return;
-  const next = (idx + dir + tabs.length) % tabs.length;
-  activateTab(tabs[next].id);
+  activateTab(tabs[(idx + dir + tabs.length) % tabs.length].id);
 }
 
 // ── Eventos de cada webview ─────────────────────────────────────────────
@@ -154,13 +171,26 @@ function wireWebview(tab) {
   const wv = tab.webview;
   const isActive = () => tab.id === activeTabId;
 
-  const onNavigate = (url) => {
+  const onNavigate = async (url) => {
     tab.url = url;
+    tab.isNewTab = false;
+    saveSession();
     if (isActive()) {
+      hideNewtab();
       urlBar.value = url;
       prettifySecure(url);
       updateNavButtons();
       refreshBookmarkStar();
+      hideSuggestions();
+      // Aplicar zoom salvo para este hostname
+      try {
+        const hostname = new URL(url).hostname;
+        if (hostname) {
+          const saved = await API.zoom.get(hostname);
+          wv.setZoomLevel(saved ?? 0);
+          updateZoomLabel();
+        }
+      } catch (_) {}
     }
   };
 
@@ -171,7 +201,7 @@ function wireWebview(tab) {
     tab.title = e.title || tab.url || 'Nova aba';
     tab.tabEl.querySelector('.tab-title').textContent = tab.title;
     tab.tabEl.title = tab.title;
-    if (isActive()) document.title = `${tab.title} — CFBrowser`;
+    if (isActive()) document.title = `${tab.title} — Certix`;
   });
 
   wv.addEventListener('page-favicon-updated', (e) => {
@@ -190,13 +220,12 @@ function wireWebview(tab) {
     tab.loading = false;
     tab.tabEl.classList.remove('loading');
     if (isActive()) { setLoading(false); updateNavButtons(); }
-    // Registrar no histórico ao terminar de carregar (título já disponível).
     const url = wv.getURL();
     if (url && /^https?:/.test(url)) API.history.add(url, wv.getTitle());
   });
 
   wv.addEventListener('did-fail-load', (e) => {
-    if (e.errorCode === -3) return; // abortado pelo usuário
+    if (e.errorCode === -3) return;
     console.error(`[WebView] Falha: ${e.errorDescription} (${e.errorCode}) ${e.validatedURL}`);
   });
 
@@ -206,11 +235,11 @@ function wireWebview(tab) {
   });
 }
 
-// ── Sincronização da toolbar com a aba ativa ────────────────────────────
+// ── Sincronização da toolbar ────────────────────────────────────────────
 function syncToolbar(tab) {
   urlBar.value = tab.url || '';
   prettifySecure(tab.url || '');
-  document.title = tab.title ? `${tab.title} — CFBrowser` : 'CFBrowser';
+  document.title = tab.title ? `${tab.title} — Certix` : 'Certix';
   setLoading(tab.loading);
   updateNavButtons();
   refreshBookmarkStar();
@@ -219,11 +248,8 @@ function syncToolbar(tab) {
 
 function setLoading(on) {
   loadingInd.classList.toggle('loading', on);
-  if (on) {
-    btnReload.innerHTML = '&#10005;'; btnReload.title = 'Parar';
-  } else {
-    btnReload.innerHTML = '&#8635;'; btnReload.title = 'Recarregar (Ctrl+R)';
-  }
+  btnReload.innerHTML = on ? '&#10005;' : '&#8635;';
+  btnReload.title = on ? 'Parar' : 'Recarregar (Ctrl+R)';
 }
 
 function updateNavButtons() {
@@ -235,8 +261,131 @@ function updateNavButtons() {
 function navigateActive(input) {
   const url = parseInput(input);
   const wv = activeTab()?.webview;
-  if (url && wv) wv.loadURL(url).catch(() => { wv.src = url; });
+  if (url && wv) {
+    hideNewtab();
+    wv.loadURL(url).catch(() => { wv.src = url; });
+  }
 }
+
+// ── Nova aba (overlay) ──────────────────────────────────────────────────
+function showNewtab() {
+  newtabOverlay.hidden = false;
+  loadNewtabContent();
+  setTimeout(() => newtabSearch?.focus(), 50);
+}
+
+function hideNewtab() {
+  newtabOverlay.hidden = true;
+}
+
+async function loadNewtabContent() {
+  const [bookmarkList, recentList] = await Promise.all([
+    API.bookmarks.list(),
+    API.history.list(10),
+  ]);
+
+  newtabBookmarks.innerHTML = '';
+  for (const b of bookmarkList.slice(0, 8)) {
+    const el = document.createElement('a');
+    el.className = 'newtab-shortcut';
+    el.href = '#';
+    const initials = (b.title || b.url).replace(/^https?:\/\//, '').slice(0, 2).toUpperCase();
+    el.innerHTML = `<span class="shortcut-icon"></span><span class="shortcut-label"></span>`;
+    el.querySelector('.shortcut-icon').textContent = initials;
+    el.querySelector('.shortcut-label').textContent = b.title || b.url;
+    el.addEventListener('click', (e) => { e.preventDefault(); navigateActive(b.url); hideNewtab(); });
+    newtabBookmarks.appendChild(el);
+  }
+  if (!bookmarkList.length) {
+    newtabBookmarks.innerHTML = '<span style="font-size:12px;color:#4a5568">Nenhum favorito ainda.</span>';
+  }
+
+  newtabRecent.innerHTML = '';
+  for (const h of recentList.slice(0, 6)) {
+    const el = document.createElement('a');
+    el.className = 'newtab-recent-item';
+    el.href = '#';
+    el.innerHTML = `<span class="recent-title"></span><span class="recent-url"></span>`;
+    el.querySelector('.recent-title').textContent = h.title || h.url;
+    el.querySelector('.recent-url').textContent = h.url;
+    el.addEventListener('click', (e) => { e.preventDefault(); navigateActive(h.url); hideNewtab(); });
+    newtabRecent.appendChild(el);
+  }
+  if (!recentList.length) {
+    newtabRecent.innerHTML = '<span style="font-size:12px;color:#4a5568">Nenhuma visita ainda.</span>';
+  }
+}
+
+newtabSearch?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const val = newtabSearch.value.trim();
+    if (val) { navigateActive(val); hideNewtab(); }
+  }
+  if (e.key === 'Escape') hideNewtab();
+});
+
+// ── Autocomplete da barra de URL ────────────────────────────────────────
+let _suggestTimer = null;
+
+function hideSuggestions() {
+  urlSuggestionsEl.hidden = true;
+  urlSuggestionsEl.innerHTML = '';
+}
+
+function positionSuggestions() {
+  const rect = urlBar.getBoundingClientRect();
+  const appRect = document.getElementById('app').getBoundingClientRect();
+  urlSuggestionsEl.style.left  = (rect.left  - appRect.left) + 'px';
+  urlSuggestionsEl.style.width = rect.width + 'px';
+  urlSuggestionsEl.style.top   = (rect.bottom - appRect.top + 4) + 'px';
+}
+
+function renderSuggestions(items) {
+  if (!items.length) { hideSuggestions(); return; }
+  urlSuggestionsEl.innerHTML = '';
+  positionSuggestions();
+  urlSuggestionsEl.hidden = false;
+  for (const item of items.slice(0, 8)) {
+    const el = document.createElement('div');
+    el.className = 'suggestion-item';
+    el.innerHTML = `<span class="sug-title"></span><span class="sug-url"></span>`;
+    el.querySelector('.sug-title').textContent = item.title || item.url;
+    el.querySelector('.sug-url').textContent = item.url;
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault(); // evitar blur antes do click
+      navigateActive(item.url);
+      urlBar.blur();
+      hideSuggestions();
+    });
+    urlSuggestionsEl.appendChild(el);
+  }
+}
+
+urlBar.addEventListener('input', () => {
+  clearTimeout(_suggestTimer);
+  const q = urlBar.value.trim();
+  if (!q) { hideSuggestions(); return; }
+  _suggestTimer = setTimeout(async () => {
+    const [histResults, allBookmarks] = await Promise.all([
+      API.history.search(q),
+      API.bookmarks.list(),
+    ]);
+    const ql = q.toLowerCase();
+    const bookFiltered = allBookmarks.filter(
+      (b) => b.url.toLowerCase().includes(ql) || (b.title || '').toLowerCase().includes(ql),
+    );
+    const seen = new Set();
+    const combined = [];
+    for (const item of [...bookFiltered, ...histResults]) {
+      if (!seen.has(item.url)) { seen.add(item.url); combined.push(item); }
+    }
+    renderSuggestions(combined);
+  }, 150);
+});
+
+urlBar.addEventListener('blur', () => {
+  setTimeout(() => hideSuggestions(), 200);
+});
 
 // ── Favoritos ───────────────────────────────────────────────────────────
 async function refreshBookmarkStar() {
@@ -337,19 +486,77 @@ function doFind(forward = true) {
 }
 
 // ── Zoom ────────────────────────────────────────────────────────────────
-function setZoom(delta) {
+async function setZoom(delta) {
   const wv = activeTab()?.webview;
   if (!wv) return;
   if (delta === 0) wv.setZoomLevel(0);
   else wv.setZoomLevel(wv.getZoomLevel() + delta);
   updateZoomLabel();
+  const url = activeTab()?.url;
+  if (url && /^https?:/.test(url)) {
+    try {
+      const hostname = new URL(url).hostname;
+      if (hostname) await API.zoom.set(hostname, wv.getZoomLevel());
+    } catch (_) {}
+  }
 }
+
 function updateZoomLabel() {
   const wv = activeTab()?.webview;
   if (!wv) return;
   const pct = Math.round(Math.pow(1.2, wv.getZoomLevel()) * 100);
   zoomLevelEl.textContent = `${pct}%`;
 }
+
+// ── Downloads ───────────────────────────────────────────────────────────
+function renderDownloads() {
+  downloadItemsEl.innerHTML = '';
+  for (const [id, dl] of [...activeDownloads.entries()].reverse()) {
+    const el = document.createElement('div');
+    el.className = 'download-item';
+    const pct = dl.total > 0 ? Math.round((dl.received / dl.total) * 100) : 0;
+    const isDone   = dl.state === 'completed';
+    const isFailed = dl.state === 'interrupted' || dl.state === 'cancelled';
+    el.innerHTML = `
+      <span class="dl-name"></span>
+      ${isDone || isFailed ? '' : `<div class="dl-progress"><div class="dl-bar" style="width:${pct}%"></div></div>`}
+      <span class="dl-status">${isDone ? 'Concluído' : isFailed ? 'Falhou' : `${pct}%`}</span>
+      ${isDone ? `<button class="dl-open">Abrir</button>` : ''}
+      <button class="dl-dismiss">&#10005;</button>`;
+    el.querySelector('.dl-name').textContent = dl.filename;
+    el.querySelector('.dl-name').title = dl.savePath;
+    if (isDone) {
+      el.querySelector('.dl-open').addEventListener('click', () => API.downloads.openFile(dl.savePath));
+    }
+    el.querySelector('.dl-dismiss').addEventListener('click', () => {
+      activeDownloads.delete(id);
+      if (activeDownloads.size === 0) downloadBar.hidden = true;
+      else renderDownloads();
+    });
+    downloadItemsEl.appendChild(el);
+  }
+}
+
+API.downloads.onStart((d) => {
+  activeDownloads.set(d.id, { ...d, received: 0, state: 'progressing' });
+  downloadBar.hidden = false;
+  renderDownloads();
+});
+API.downloads.onProgress((d) => {
+  const dl = activeDownloads.get(d.id);
+  if (dl) { dl.received = d.received; dl.total = d.total; }
+  renderDownloads();
+});
+API.downloads.onDone((d) => {
+  const dl = activeDownloads.get(d.id);
+  if (dl) { dl.state = d.state; dl.savePath = d.savePath; }
+  renderDownloads();
+});
+
+$('download-bar-close').addEventListener('click', () => {
+  activeDownloads.clear();
+  downloadBar.hidden = true;
+});
 
 // ── Menu suspenso (botão ⋮) ─────────────────────────────────────────────
 function toggleAppMenu(force) {
@@ -370,26 +577,27 @@ appMenu.addEventListener('click', (e) => {
 function handleAction(action, arg) {
   const wv = activeTab()?.webview;
   switch (action) {
-    case 'new-tab':       createTab(HOME_PAGE); break;
-    case 'close-tab':     closeTab(activeTabId); break;
-    case 'reopen-tab':    reopenClosedTab(); break;
-    case 'open-url-newtab': createTab(arg); break;
-    case 'select-tab':    selectTabByIndex(arg); break;
-    case 'next-tab':      cycleTab(1); break;
-    case 'prev-tab':      cycleTab(-1); break;
-    case 'focus-url':     urlBar.focus(); urlBar.select(); break;
-    case 'reload':        wv?.reload(); break;
-    case 'reload-hard':   wv?.reloadIgnoringCache(); break;
-    case 'back':          if (wv?.canGoBack()) wv.goBack(); break;
-    case 'forward':       if (wv?.canGoForward()) wv.goForward(); break;
-    case 'home':          navigateActive(HOME_PAGE); break;
-    case 'bookmark':      toggleBookmark(); break;
+    case 'new-tab':           createTab(); break;
+    case 'close-tab':         closeTab(activeTabId); break;
+    case 'reopen-tab':        reopenClosedTab(); break;
+    case 'open-url-newtab':   createTab(arg); break;
+    case 'select-tab':        selectTabByIndex(arg); break;
+    case 'next-tab':          cycleTab(1); break;
+    case 'prev-tab':          cycleTab(-1); break;
+    case 'focus-url':         urlBar.focus(); urlBar.select(); break;
+    case 'reload':            wv?.reload(); break;
+    case 'reload-hard':       wv?.reloadIgnoringCache(); break;
+    case 'back':              if (wv?.canGoBack()) wv.goBack(); break;
+    case 'forward':           if (wv?.canGoForward()) wv.goForward(); break;
+    case 'home':              navigateActive(HOME_PAGE); break;
+    case 'bookmark':          toggleBookmark(); break;
     case 'toggle-bookmarks-bar': bookmarksBar.classList.toggle('hidden'); break;
-    case 'history':       historyOverlay.hidden ? openHistory() : closeHistory(); break;
-    case 'find':          openFind(); break;
-    case 'zoom-in':       setZoom(0.5); break;
-    case 'zoom-out':      setZoom(-0.5); break;
-    case 'zoom-reset':    setZoom(0); break;
+    case 'history':           historyOverlay.hidden ? openHistory() : closeHistory(); break;
+    case 'find':              openFind(); break;
+    case 'zoom-in':           setZoom(0.5); break;
+    case 'zoom-out':          setZoom(-0.5); break;
+    case 'zoom-reset':        setZoom(0); break;
+    case 'print':             wv?.print(); break;
     case 'devtools':
       if (wv) wv.isDevToolsOpened() ? wv.closeDevTools() : wv.openDevTools();
       break;
@@ -398,8 +606,15 @@ function handleAction(action, arg) {
 
 // ── Listeners de botões/inputs ──────────────────────────────────────────
 urlBar.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { navigateActive(urlBar.value); activeTab()?.webview.focus(); }
-  else if (e.key === 'Escape') { urlBar.value = activeTab()?.url || ''; urlBar.blur(); }
+  if (e.key === 'Enter') {
+    hideSuggestions();
+    navigateActive(urlBar.value);
+    activeTab()?.webview.focus();
+  } else if (e.key === 'Escape') {
+    urlBar.value = activeTab()?.url || '';
+    urlBar.blur();
+    hideSuggestions();
+  }
 });
 urlBar.addEventListener('focus', () => urlBar.select());
 
@@ -411,7 +626,7 @@ btnReload.addEventListener('click', () => {
 });
 btnHome.addEventListener('click', () => handleAction('home'));
 btnBookmark.addEventListener('click', () => toggleBookmark());
-btnNewTab.addEventListener('click', () => createTab(HOME_PAGE));
+btnNewTab.addEventListener('click', () => createTab());
 btnMenu.addEventListener('click', (e) => { e.stopPropagation(); updateZoomLabel(); toggleAppMenu(); });
 
 // Find bar
@@ -434,8 +649,8 @@ historySearch.addEventListener('input', async () => {
 historyOverlay.addEventListener('click', (e) => { if (e.target === historyOverlay) closeHistory(); });
 
 // ── Controles de janela (frameless) ─────────────────────────────────────
-const winMax = $('win-max');
-const icoMax = winMax.querySelector('.ico-max');
+const winMax    = $('win-max');
+const icoMax    = winMax.querySelector('.ico-max');
 const icoRestore = winMax.querySelector('.ico-restore');
 
 function setMaxIcon(isMax) {
@@ -453,12 +668,13 @@ API.window.onMaximizeChange(setMaxIcon);
 // Ações vindas do Menu nativo / atalhos (main process)
 API.onMenuAction((action, ...args) => handleAction(action, args[0]));
 
-// Fallback de teclado para Escape global
+// Fallback Escape global
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (!appMenu.hidden) toggleAppMenu(false);
     else if (!historyOverlay.hidden) closeHistory();
     else if (!findBar.hidden) closeFind();
+    else if (!newtabOverlay.hidden) hideNewtab();
   }
 });
 
@@ -467,5 +683,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   HOME_PAGE = await API.getHomePage();
   setMaxIcon(await API.window.isMaximized());
   await renderBookmarksBar();
+
+  // Sempre abre a home page como primeira aba ativa
   createTab(HOME_PAGE);
+
+  // Restaura abas da sessão anterior como tabs em background
+  const saved = await API.session.load();
+  if (saved && Array.isArray(saved.tabs)) {
+    for (const t of saved.tabs) {
+      if (t.url && t.url !== HOME_PAGE) {
+        createTab(t.url, { activate: false });
+      }
+    }
+  }
 });

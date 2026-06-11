@@ -50,11 +50,35 @@
       <button class="nav-btn" id="btn-menu" title="Menu">&#8942;</button>
     </nav>
 
+    <!-- ── Autocomplete da barra de URL ──────────────────────────────── -->
+    <div id="url-suggestions" hidden></div>
+
     <!-- ── Barra de favoritos ─────────────────────────────────────────── -->
     <div id="bookmarks-bar"></div>
 
     <!-- ── Container das webviews (uma por aba) ───────────────────────── -->
-    <div id="webviews"></div>
+    <div id="webviews">
+      <!-- ── Overlay de nova aba ─────────────────────────────────────── -->
+      <div id="newtab-overlay" hidden>
+        <div id="newtab-content">
+          <div id="newtab-logo">Certix</div>
+          <div id="newtab-search-wrap">
+            <span id="newtab-search-icon">&#128269;</span>
+            <input id="newtab-search" type="text" placeholder="Pesquisar ou digitar URL..." spellcheck="false" />
+          </div>
+          <div id="newtab-sections">
+            <div class="newtab-section">
+              <h3>Favoritos</h3>
+              <div id="newtab-bookmarks"></div>
+            </div>
+            <div class="newtab-section">
+              <h3>Visitados recentemente</h3>
+              <div id="newtab-recent"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- ── Barra de busca na página ───────────────────────────────────── -->
     <div id="find-bar" hidden>
@@ -63,6 +87,12 @@
       <button id="find-prev" class="find-btn" title="Anterior">&#8593;</button>
       <button id="find-next" class="find-btn" title="Próximo">&#8595;</button>
       <button id="find-close" class="find-btn" title="Fechar">&#10005;</button>
+    </div>
+
+    <!-- ── Barra de downloads ────────────────────────────────────────── -->
+    <div id="download-bar" hidden>
+      <div id="download-items"></div>
+      <button id="download-bar-close" title="Fechar">&#10005;</button>
     </div>
 
     <!-- ── Menu suspenso (botão ⋮) ────────────────────────────────────── -->

@@ -13,7 +13,7 @@ html, body {
   font-size: 13px;
 }
 
-#app { display: flex; flex-direction: column; height: 100vh; }
+#app { display: flex; flex-direction: column; height: 100vh; position: relative; }
 
 button { font-family: inherit; }
 
@@ -248,6 +248,120 @@ webview.active { display: flex; }
 }
 .history-del:hover { background: #e94560; color: #fff; opacity: 1; }
 .history-empty { padding: 30px; text-align: center; color: #718096; }
+
+/* ── Autocomplete URL ─────────────────────────────────────────────────── */
+#url-suggestions {
+  position: absolute;
+  left: 0; right: 0;
+  background: #16213e;
+  border: 1px solid #0f3460;
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 300;
+  overflow: hidden;
+}
+.suggestion-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 14px; cursor: pointer;
+  border-bottom: 1px solid #0d1b2a;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:hover { background: #0f3460; }
+.sug-title { font-size: 13px; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sug-url   { font-size: 11px; color: #5b9bd5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Nova aba (overlay dentro de #webviews) ───────────────────────────── */
+#newtab-overlay {
+  position: absolute; inset: 0; z-index: 10;
+  background: #1a1a2e;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 6vh;
+  overflow-y: auto;
+}
+#newtab-content {
+  width: min(680px, 92%);
+  display: flex; flex-direction: column; align-items: center; gap: 28px;
+}
+#newtab-logo {
+  font-size: 28px; font-weight: 700; color: #fff; letter-spacing: 0.04em;
+}
+#newtab-search-wrap {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 0 16px; height: 48px;
+  background: #16213e; border: 1px solid #0f3460; border-radius: 24px;
+  transition: border-color 0.15s;
+}
+#newtab-search-wrap:focus-within { border-color: #5b9bd5; }
+#newtab-search-icon { font-size: 16px; opacity: 0.6; flex-shrink: 0; }
+#newtab-search {
+  flex: 1; border: none; background: transparent;
+  color: #e0e0e0; font-size: 15px; outline: none;
+}
+#newtab-sections { width: 100%; display: flex; flex-direction: column; gap: 20px; }
+.newtab-section h3 {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.08em; color: #4a5568; margin-bottom: 10px;
+}
+#newtab-bookmarks {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.newtab-shortcut {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  width: 72px; padding: 10px 6px; border-radius: 10px;
+  background: #16213e; text-decoration: none; color: #cbd5e0;
+  transition: background 0.15s;
+}
+.newtab-shortcut:hover { background: #1c2a4e; }
+.shortcut-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  background: #0f3460; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700; color: #90cdf4;
+}
+.shortcut-label { font-size: 11px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+#newtab-recent { display: flex; flex-direction: column; gap: 4px; }
+.newtab-recent-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 7px 12px; border-radius: 6px;
+  background: transparent; text-decoration: none; color: #e0e0e0;
+  transition: background 0.15s;
+}
+.newtab-recent-item:hover { background: #16213e; }
+.recent-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-url   { font-size: 11px; color: #5b9bd5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Barra de downloads ───────────────────────────────────────────────── */
+#download-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+  background: #16213e; border-top: 1px solid #0f3460;
+  flex-shrink: 0; overflow-x: auto;
+}
+#download-bar::-webkit-scrollbar { height: 0; }
+#download-items { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.download-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 10px; border-radius: 6px; background: #0d1b2a;
+  font-size: 12px; white-space: nowrap; flex-shrink: 0;
+  max-width: 300px;
+}
+.dl-name { overflow: hidden; text-overflow: ellipsis; max-width: 140px; color: #e0e0e0; }
+.dl-progress { width: 80px; height: 4px; background: #0f3460; border-radius: 2px; flex-shrink: 0; }
+.dl-bar { height: 100%; background: #5b9bd5; border-radius: 2px; transition: width 0.2s; }
+.dl-status { color: #a0aec0; font-size: 11px; flex-shrink: 0; }
+.dl-open, .dl-dismiss {
+  border: none; border-radius: 4px; padding: 3px 8px;
+  background: #0f3460; color: #cbd5e0; font-size: 11px; cursor: pointer;
+  flex-shrink: 0;
+}
+.dl-open:hover { background: #5b9bd5; color: #fff; }
+.dl-dismiss:hover { background: #e94560; color: #fff; }
+#download-bar-close {
+  border: none; background: transparent; color: #a0aec0;
+  font-size: 14px; cursor: pointer; flex-shrink: 0; padding: 4px 6px;
+  border-radius: 4px;
+}
+#download-bar-close:hover { background: #e94560; color: #fff; }
 
 /* ── Scrollbar customizada ────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }

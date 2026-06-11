@@ -1,7 +1,8 @@
 {
-  "name": "cfbrowser",
+  "name": "certix",
   "version": "1.0.0",
-  "description": "CFBrowser — browser desktop customizável com Electron",
+  "productName": "Certix",
+  "description": "Certix — browser com autenticação por certificado digital ICP-Brasil",
   "main": "main.js",
   "scripts": {
     "start": "electron ."

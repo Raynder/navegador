@@ -37,6 +37,26 @@ contextBridge.exposeInMainWorld('browserAPI', {
       ipcRenderer.on('window:maximized', (_e, isMax) => callback(isMax)),
   },
 
+  // ── Sessão ─────────────────────────────────────────────────────────────
+  session: {
+    save: (data) => ipcRenderer.invoke('session:save', data),
+    load: () => ipcRenderer.invoke('session:load'),
+  },
+
+  // ── Zoom por site ──────────────────────────────────────────────────────
+  zoom: {
+    set: (hostname, level) => ipcRenderer.invoke('zoom:set', { hostname, level }),
+    get: (hostname) => ipcRenderer.invoke('zoom:get', hostname),
+  },
+
+  // ── Downloads ──────────────────────────────────────────────────────────
+  downloads: {
+    onStart:    (cb) => ipcRenderer.on('download:start',    (_e, d) => cb(d)),
+    onProgress: (cb) => ipcRenderer.on('download:progress', (_e, d) => cb(d)),
+    onDone:     (cb) => ipcRenderer.on('download:done',     (_e, d) => cb(d)),
+    openFile:   (p)  => ipcRenderer.invoke('shell:open-path', p),
+  },
+
   /**
    * Recebe ações de menu/atalho vindas do main process.
    * @param {(action: string, ...args: any[]) => void} callback

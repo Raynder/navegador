@@ -138,4 +138,47 @@ class BookmarksStore {
   }
 }
 
-module.exports = { HistoryStore, BookmarksStore };
+// ---------------------------------------------------------------------------
+// Sessão (abas abertas — restaura no próximo start)
+// ---------------------------------------------------------------------------
+class SessionStore {
+  constructor(dir) {
+    this.store = new JsonStore(dir, 'session.json', null);
+  }
+  save(data) { this.store.set(data); }
+  load() { return this.store.get(); }
+}
+
+// ---------------------------------------------------------------------------
+// Certificados recentes
+// ---------------------------------------------------------------------------
+class CertRecentStore {
+  constructor(dir) {
+    this.store = new JsonStore(dir, 'cert-recent.json', []);
+  }
+  add(cert) {
+    const list = this.store.get().filter((c) => c.fingerprint !== cert.fingerprint);
+    list.unshift({ subjectName: cert.subjectName, fingerprint: cert.fingerprint, lastUsed: Date.now() });
+    if (list.length > 10) list.length = 10;
+    this.store.set(list);
+  }
+  list() { return this.store.get(); }
+}
+
+// ---------------------------------------------------------------------------
+// Zoom por hostname
+// ---------------------------------------------------------------------------
+class ZoomStore {
+  constructor(dir) {
+    this.store = new JsonStore(dir, 'zoom.json', {});
+  }
+  set(hostname, level) {
+    const data = this.store.get();
+    if (level === 0) delete data[hostname];
+    else data[hostname] = level;
+    this.store.set(data);
+  }
+  get(hostname) { return this.store.get()[hostname] ?? 0; }
+}
+
+module.exports = { HistoryStore, BookmarksStore, SessionStore, CertRecentStore, ZoomStore };

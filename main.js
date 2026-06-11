@@ -12,16 +12,16 @@
  *   - Atalhos de teclado via Menu (Ctrl+T, Ctrl+L, F12, ...)
  */
 
-const { app, BrowserWindow, session, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, session, ipcMain, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { setupInterceptor } = require('./proxy/interceptor');
-const { HistoryStore, BookmarksStore } = require('./store');
+const { HistoryStore, BookmarksStore, SessionStore, CertRecentStore, ZoomStore } = require('./store');
 
 // ---------------------------------------------------------------------------
 // BRANDING — altere as variáveis abaixo para customizar o browser
 // ---------------------------------------------------------------------------
-const APP_NAME = 'CFBrowser';
+const APP_NAME = 'Certix';
 const HOME_PAGE = 'https://www.google.com';
 
 // Partição persistente usada por todas as abas (cookies/login sobrevivem entre sessões)
@@ -54,6 +54,9 @@ let SEC_CH_UA = '';
 let SEC_CH_UA_FULL = '';
 let history = null;
 let bookmarks = null;
+let sessionStore = null;
+let certRecent = null;
+let zoomStore = null;
 const WEBVIEW_PRELOAD = path.join(__dirname, 'webview-preload.js');
 
 // ---------------------------------------------------------------------------
@@ -200,7 +203,7 @@ function showCertDialog(url, list, callback) {
       validExpiry: c.validExpiry,
       fingerprint: c.fingerprint,
     }));
-    dialog.webContents.send('cert-list', { url, list: serializable });
+    dialog.webContents.send('cert-list', { url, list: serializable, recent: certRecent.list() });
   });
 
   let settled = false;
@@ -210,6 +213,7 @@ function showCertDialog(url, list, callback) {
     ipcMain.removeAllListeners('cert-selected');
     ipcMain.removeAllListeners('cert-cancelled');
     if (!dialog.isDestroyed()) dialog.close();
+    if (cert) certRecent.add({ subjectName: cert.subjectName, fingerprint: cert.fingerprint });
     console.log(cert !== undefined
       ? `[Cert] Selecionado: ${cert?.subjectName}` : '[Cert] Cancelado.');
     callback(cert);
@@ -250,8 +254,26 @@ function configureSession() {
   // Aceitar certificados self-signed / de autoridades internas.
   ses.setCertificateVerifyProc((_request, callback) => callback(0));
 
-  // Permissões (câmera, notificações, etc.) — conceder para um navegador comum.
-  ses.setPermissionRequestHandler((_wc, _permission, cb) => cb(true));
+  // Permissões — conceder automaticamente apenas o conjunto seguro; demais precisam
+  // ser aprovadas explicitamente (câmera e microfone ficam para o Chromium nativo).
+  const AUTO_GRANT = new Set(['notifications', 'fullscreen', 'pointerLock', 'clipboard-sanitized-write']);
+  ses.setPermissionRequestHandler((_wc, permission, cb) => cb(AUTO_GRANT.has(permission)));
+
+  // Downloads — salva em ~/Downloads e notifica o renderer com progresso.
+  ses.on('will-download', (_event, item) => {
+    const id = Date.now();
+    const filename = item.getFilename();
+    const savePath = path.join(app.getPath('downloads'), filename);
+    item.setSavePath(savePath);
+    const notify = (ch, data) => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(ch, data);
+    };
+    notify('download:start', { id, filename, savePath, total: item.getTotalBytes() });
+    item.on('updated', (_e, state) =>
+      notify('download:progress', { id, state, received: item.getReceivedBytes(), total: item.getTotalBytes() }));
+    item.on('done', (_e, state) =>
+      notify('download:done', { id, state, savePath, filename }));
+  });
 
   // Seleção de certificado cliente — evento de app, vale para todas as sessões.
   app.on('select-client-certificate', (event, _webContents, url, list, callback) => {
@@ -292,6 +314,17 @@ function setupIpcHandlers() {
   ipcMain.handle('history:search', (_e, q) => history.search(q));
   ipcMain.handle('history:clear', () => { history.clear(); return []; });
   ipcMain.handle('history:remove', (_e, url) => { history.removeUrl(url); return history.list(); });
+
+  // Sessão
+  ipcMain.handle('session:save', (_e, data) => sessionStore.save(data));
+  ipcMain.handle('session:load', () => sessionStore.load());
+
+  // Zoom por site
+  ipcMain.handle('zoom:set', (_e, { hostname, level }) => zoomStore.set(hostname, level));
+  ipcMain.handle('zoom:get', (_e, hostname) => zoomStore.get(hostname));
+
+  // Shell — abrir arquivo/pasta no explorador
+  ipcMain.handle('shell:open-path', (_e, filePath) => shell.openPath(filePath));
 
   // Favoritos
   ipcMain.handle('bookmarks:list', () => bookmarks.list());
@@ -364,6 +397,8 @@ function buildMenu() {
         { label: 'Aumentar zoom', accelerator: 'CmdOrCtrl+=', click: () => send('zoom-in'), visible: false },
         { label: 'Diminuir zoom', accelerator: 'CmdOrCtrl+-', click: () => send('zoom-out') },
         { label: 'Zoom normal', accelerator: 'CmdOrCtrl+0', click: () => send('zoom-reset') },
+        { type: 'separator' },
+        { label: 'Imprimir', accelerator: 'CmdOrCtrl+P', click: () => send('print') },
         { type: 'separator' },
         { label: 'Ferramentas do desenvolvedor', accelerator: 'F12', click: () => send('devtools') },
         { label: 'DevTools (Ctrl+Shift+I)', accelerator: 'CmdOrCtrl+Shift+I', click: () => send('devtools'), visible: false },
@@ -490,6 +525,9 @@ app.whenReady().then(async () => {
 
   history = new HistoryStore(app.getPath('userData'));
   bookmarks = new BookmarksStore(app.getPath('userData'));
+  sessionStore = new SessionStore(app.getPath('userData'));
+  certRecent = new CertRecentStore(app.getPath('userData'));
+  zoomStore = new ZoomStore(app.getPath('userData'));
 
   const ses = configureSession();
   setupIpcHandlers();
